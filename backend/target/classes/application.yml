@@ -1,0 +1,50 @@
+# 应用配置
+spring:
+  application:
+    name: s2admin-backend
+
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/s2admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: root123
+
+  # JPA 配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  # Redis 配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+
+# 服务器配置
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# JWT 配置
+jwt:
+  # JWT 密钥 (生产环境应从环境变量或配置中心获取)
+  secret: s2admin-secret-key-change-in-production-minimum-32-characters
+  # AccessToken 有效期 (毫秒) - 15分钟
+  access-token-expiration: 900000
+  # RefreshToken 有效期 (毫秒) - 7天
+  refresh-token-expiration: 604800000
+
+# 日志配置
+logging:
+  level:
+    com.s2admin: debug
+    org.springframework.security: debug
