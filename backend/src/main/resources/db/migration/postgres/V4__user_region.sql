@@ -1,0 +1,3 @@
+ALTER TABLE sys_user ADD COLUMN province VARCHAR(50);
+ALTER TABLE sys_user ADD COLUMN city VARCHAR(50);
+ALTER TABLE sys_user ADD COLUMN district VARCHAR(50);

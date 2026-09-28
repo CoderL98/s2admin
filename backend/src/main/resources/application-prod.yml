@@ -1,0 +1,23 @@
+# 生产配置:与 mysql/postgres profile 叠加,例如
+# --spring.profiles.active=prod,mysql
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+s2admin:
+  mail:
+    mock: false
+
+logging:
+  level:
+    com.s2admin: info
+    org.hibernate.SQL: warn
+    root: warn

@@ -1,0 +1,4 @@
+.dev/
+uploads/
+*.log
+.DS_Store

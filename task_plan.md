@@ -4,11 +4,11 @@
 
 为通用后台管理系统创建详细的需求文档和设计文档，技术栈：
 - **前端**：Svelte5 + SvelteKit + shadcn-svelte + TypeScript + TailwindCSS
-- **后端**：SpringBoot + JDK21 + MySQL + Redis + JWT
+- **后端**：SpringBoot + JDK25 + MySQL + Redis + JWT
 
 ## 当前阶段
 
-**当前阶段**：核心功能开发阶段 (Phase 6) - 待开始
+**当前阶段**：P0 + 主要 P1 已落地。2026-09-23 又修了一批权限、登录锁定、菜单可见性和导入/会话逻辑缺陷。缺口见 `功能缺口与缺陷.md`。下一轮：真实邮件/S3 SDK、完整县级区划、跨级拖拽、OpenAPI。
 
 ---
 
@@ -21,7 +21,7 @@
 
 ### 阶段 5：项目初始化 ✅ 已完成
 - [x] 前端项目初始化 (SvelteKit + TailwindCSS + shadcn-svelte)
-- [x] 后端项目初始化 (SpringBoot + JDK21)
+- [x] 后端项目初始化 (SpringBoot + JDK25)
 - [x] 数据库初始化脚本创建
 - **状态**：已完成 (2026-04-27)
 
@@ -31,13 +31,33 @@
 - [x] shadcn-svelte 组件库安装 (avatar, badge, chart, checkbox, data-table, drawer, dropdown-menu, field, select, separator, sheet, sidebar, skeleton, table, tabs, toggle, tooltip 等)
 - **状态**：已完成 (2026-04-27)
 
-### 阶段 6：核心功能开发 🚧 待开始
-- [ ] 公共模块开发 (统一响应、异常处理、工具类)
-- [ ] 安全模块开发 (JWT Token、Spring Security)
-- [ ] 认证授权模块 (登录、登出、Token 刷新)
-- [ ] 用户管理模块 (用户 CRUD)
-- [ ] 角色权限模块 (角色管理、权限分配)
-- **状态**：待开始
+### 阶段 6：核心功能开发 ✅ 骨架已完成,正在打磨
+- [x] 公共模块开发 (统一响应、异常处理、工具类)
+- [x] 安全模块开发 (JWT Token、Spring Security)
+- [x] 认证授权模块 (登录、登出、Token 刷新)
+- [x] 用户管理模块 (用户 CRUD)
+- [x] 角色权限模块 (角色管理、权限分配)
+- [x] 菜单 / 权限 / 配置 / 字典 / 日志 后端与页面
+- [x] SUPER_ADMIN `*` 权限与 `@PreAuthorize` 对齐
+- [x] AccessToken 黑名单在过滤器生效
+- [x] 前端会话恢复、动态菜单、真分页、角色授权
+- [x] 个人中心(资料/改密/头像)
+- [x] 登录验证码与失败锁定
+- [x] 用户 CSV 导入导出
+- [x] 本地文件上传
+- [x] 配置/字典 Redis 缓存
+- [x] JDK 25 + Lombok 1.18.40 编译通过（MenuService Set/List 类型一并修）
+- [x] `./dev.sh` 启停/重启/状态/日志
+- [x] 缺口盘点写入 `功能缺口与缺陷.md`
+- [x] 2026-08-25：正确性/安全缺陷与 P0 体验（邮箱手机登录、文件鉴权、批量、日志筛选导出、超管保护、软删唯一键）
+- [x] 2026-08-25：P1 部门+dataScope、记住我、忘记密码、文件管理页、公告/站内信、Excel、代码生成、生产 profile
+- [x] 2026-08-26：缺陷自检（dataScope IDOR、JWT 角色、文件 MIME、分页钳制、树成环、字典 Tab、假 zip）
+- [x] 2026-08-26：继续完善（操作日志快照、dataScope 文件/日志/部门、Refresh 一次性、强制改密、菜单图标与排序、配置分组、置顶公告、Compose）
+- [x] 2026-08-26：再次自检（随机初始口令、文件下载/删除越权、仪表盘 dataScope、强制改密 403 跳转、codegen 表名）
+- [x] 2026-08-26：审计补丁（pwd_reset 迁移、JOIN FETCH、角色 dataScope、JPA 审计、日志详情范围）
+- [x] 2026-08-26：前端审计（强制改密壳、Mock 分流、业务 401、字典分页、筛选哨兵值）
+- [x] 2026-08-26：多端登录 sid、个人中心设备/日志、站内信删除、导出字段、省市县、外链菜单、置顶公告弹窗
+- **状态**：P1 可交接；需求缺口本轮已补 (2026-08-26)
 
 ---
 
@@ -115,7 +135,7 @@
 | 决策 | 理由 |
 |------|------|
 | 前端技术栈：Svelte5 + SvelteKit + shadcn-svelte | Svelte5 Runes 语法提供更好的响应式编程体验 |
-| 后端技术栈：SpringBoot + JDK21 | JDK21 虚拟线程提升并发性能，SpringBoot 3.x 原生支持 |
+| 后端技术栈：SpringBoot + JDK25 | JDK25 虚拟线程提升并发性能，SpringBoot 3.5+ 官方支持 |
 | 数据库：MySQL 8.x | 成熟稳定，支持 JSON、窗口函数等现代 SQL 特性 |
 | 缓存：Redis 7.x | 高性能缓存，支持多种数据结构 |
 | 状态管理：Pinia | Svelte 官方推荐的状态管理库 |
@@ -211,19 +231,19 @@
 #### 1.2.1 创建 SpringBoot 项目
 | 任务 | 具体操作 | 产出物 | 优先级 |
 |------|----------|--------|--------|
-| 检查 JDK 环境 | 确保 JDK 21 已安装 | JDK 环境 | P0 |
+| 检查 JDK 环境 | 确保 JDK 25 已安装 | JDK 环境 | P0 |
 | 创建项目 | 使用 Spring Initializr 或 IDE 创建项目 | 项目基础结构 | P0 |
 | 选择依赖 | Spring Web, Spring Security, Spring Data JPA, MySQL Driver, Redis, Lombok, Validation | pom.xml | P0 |
 | 导入 Maven 依赖 | `mvn clean install` | 依赖下载 | P0 |
 | 配置 Git 仓库 | 创建 .gitignore | Git 仓库 | P1 |
 
-#### 1.2.2 配置 JDK21 和 SpringBoot 3.x
+#### 1.2.2 配置 JDK25 和 SpringBoot 3.x
 | 任务 | 具体操作 | 产出物 | 优先级 |
 |------|----------|--------|--------|
-| 配置 pom.xml | 设置 java-version=21, maven-compiler | 编译配置 | P0 |
+| 配置 pom.xml | 设置 java-version=25, maven-compiler | 编译配置 | P0 |
 | 配置 application.yml | 配置端口、上下文路径 | 应用配置 | P0 |
 | 创建主启动类 | S2AdminApplication.java | 启动类 | P0 |
-| 启用虚拟线程 | 配置虚拟线程 executor | 性能优化 | P1 |
+| 虚拟线程 | 已关闭(SQLite 模式下 sqlite-jdbc JNI 阻塞与虚拟线程不兼容) | 配置说明 | P1 |
 
 #### 1.2.3 配置数据层
 | 任务 | 具体操作 | 产出物 | 优先级 |
@@ -649,4 +669,4 @@
 |------|------|----------|------|
 | V1.0.0 | 2026-04-24 | 初始版本，包含需求文档和设计文档 | AI Assistant |
 | V1.0.1 | 2026-04-24 | 增强下一步开发计划，详细描述各阶段任务 | AI Assistant |
-| V1.0.2 | 2026-04-27 | 完成项目初始化阶段：创建前端项目(SvelteKit+TailwindCSS)、后端项目(SpringBoot+JDK21)、数据库初始化脚本 | AI Assistant |
+| V1.0.2 | 2026-04-27 | 完成项目初始化阶段：创建前端项目(SvelteKit+TailwindCSS)、后端项目(SpringBoot+JDK25)、数据库初始化脚本 | AI Assistant |

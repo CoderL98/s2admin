@@ -1,0 +1,1 @@
+ALTER TABLE sys_user ADD COLUMN pwd_reset TINYINT DEFAULT 0;

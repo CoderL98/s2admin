@@ -78,6 +78,9 @@ importers:
       layerchart:
         specifier: 2.0.0-next.48
         version: 2.0.0-next.48(@sveltejs/kit@2.58.0(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.5)(vite@8.0.10(jiti@2.6.1)))(svelte@5.55.5)(typescript@6.0.3)(vite@8.0.10(jiti@2.6.1)))(svelte@5.55.5)(zod@4.3.6)
+      lightningcss-linux-x64-gnu:
+        specifier: 1.32.0
+        version: 1.32.0
       svelte:
         specifier: ^5.55.2
         version: 5.55.5
@@ -1690,8 +1693,7 @@ snapshots:
   lightningcss-linux-arm64-musl@1.32.0:
     optional: true
 
-  lightningcss-linux-x64-gnu@1.32.0:
-    optional: true
+  lightningcss-linux-x64-gnu@1.32.0: {}
 
   lightningcss-linux-x64-musl@1.32.0:
     optional: true

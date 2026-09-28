@@ -3,21 +3,34 @@ spring:
   application:
     name: s2admin-backend
 
-  # 数据源配置
+  # 虚拟线程与 sqlite-jdbc(JNI 阻塞库)组合会导致 Tomcat 虚拟线程在
+  # 原生调用中钉住/中断后产生 Hikari 连接孤儿(连接池耗尽),SQLite 模式下必须关闭。
+  threads:
+    virtual:
+      enabled: false
+
+  # 数据源配置(默认 SQLite;切换 MySQL/PostgreSQL 见 application-mysql.yml / application-postgres.yml)
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/s2admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
-    username: root
-    password: root123
+    driver-class-name: org.sqlite.JDBC
+    # busy_timeout:SQLite 单写者,与外部工具并发访问时等待而非立即失败
+    url: jdbc:sqlite:./data/s2admin.db?busy_timeout=10000
+    hikari:
+      # SQLite 单写者:池=1 串行化访问,避免并发写锁冲突(登录日志已移出事务外写入)
+      maximum-pool-size: 1
+      minimum-idle: 1
+      connection-timeout: 30000
 
   # JPA 配置
   jpa:
     hibernate:
+      # 开发环境使用 update;生产环境务必改为 validate/none 并使用 Flyway
       ddl-auto: update
     show-sql: true
+    open-in-view: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
+        # SQLite 方言来自 hibernate-community-dialects
+        dialect: org.hibernate.community.dialect.SQLiteDialect
         format_sql: true
 
   # Redis 配置
@@ -27,6 +40,24 @@ spring:
       port: 6379
       password:
       database: 0
+      timeout: 3000ms
+
+  # Jackson 时间格式(配合 JacksonConfig 统一 LocalDateTime)
+  jackson:
+    time-zone: Asia/Shanghai
+
+  # 文件上传限制
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+  flyway:
+    # SQLite 默认走 Hibernate ddl-auto;MySQL/Postgres/prod profile 启用 Flyway
+    enabled: false
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration/common,classpath:db/migration/sqlite
 
 # 服务器配置
 server:
@@ -36,15 +67,71 @@ server:
 
 # JWT 配置
 jwt:
-  # JWT 密钥 (生产环境应从环境变量或配置中心获取)
-  secret: s2admin-secret-key-change-in-production-minimum-32-characters
+  # JWT 密钥 (生产环境必须通过 JWT_SECRET 覆盖,长度至少 32 字符)
+  secret: ${JWT_SECRET:s2admin-secret-key-change-in-production-minimum-32-characters}
   # AccessToken 有效期 (毫秒) - 15分钟
   access-token-expiration: 900000
   # RefreshToken 有效期 (毫秒) - 7天
   refresh-token-expiration: 604800000
+  # 记住我 RefreshToken (毫秒) - 30天
+  remember-me-refresh-expiration: 2592000000
+
+# 本地上传目录
+s2admin:
+  upload-dir: ${UPLOAD_DIR:uploads}
+  # 仅在反向代理后开启,才会信任 X-Forwarded-For
+  trusted-proxy: ${TRUSTED_PROXY:false}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  # 缓存实现:memory(默认,进程内)/ redis(需 Redis 服务,连接见 spring.data.redis)
+  cache:
+    type: memory
+  mail:
+    mock: ${MAIL_MOCK:true}
+    from: ${MAIL_FROM:noreply@s2admin.local}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    s3:
+      endpoint: ${S3_ENDPOINT:}
+      region: ${S3_REGION:us-east-1}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      bucket: ${S3_BUCKET:s2admin}
+      path-style: ${S3_PATH_STYLE:true}
+      public-base-url: ${S3_PUBLIC_BASE_URL:}
+  # 第三方登录默认关闭。配齐 enabled 与客户端密钥后,登录页才会出现按钮。
+  # Apple 的 client-secret 是预先签好的 JWT;也可改用 team-id、key-id 与 private-key-path 由服务现签。
+  oauth:
+    frontend-redirect: ${OAUTH_FRONTEND_REDIRECT:http://localhost:5173/login}
+    google:
+      enabled: ${OAUTH_GOOGLE_ENABLED:false}
+      client-id: ${OAUTH_GOOGLE_CLIENT_ID:}
+      client-secret: ${OAUTH_GOOGLE_CLIENT_SECRET:}
+      redirect-uri: ${OAUTH_GOOGLE_REDIRECT:http://127.0.0.1:8080/api/auth/oauth/google/callback}
+    microsoft:
+      enabled: ${OAUTH_MICROSOFT_ENABLED:false}
+      client-id: ${OAUTH_MICROSOFT_CLIENT_ID:}
+      client-secret: ${OAUTH_MICROSOFT_CLIENT_SECRET:}
+      tenant: ${OAUTH_MICROSOFT_TENANT:common}
+      redirect-uri: ${OAUTH_MICROSOFT_REDIRECT:http://127.0.0.1:8080/api/auth/oauth/microsoft/callback}
+    wechat:
+      enabled: ${OAUTH_WECHAT_ENABLED:false}
+      app-id: ${OAUTH_WECHAT_APP_ID:}
+      app-secret: ${OAUTH_WECHAT_APP_SECRET:}
+      redirect-uri: ${OAUTH_WECHAT_REDIRECT:http://127.0.0.1:8080/api/auth/oauth/wechat/callback}
+    apple:
+      enabled: ${OAUTH_APPLE_ENABLED:false}
+      client-id: ${OAUTH_APPLE_CLIENT_ID:}
+      client-secret: ${OAUTH_APPLE_CLIENT_SECRET:}
+      team-id: ${OAUTH_APPLE_TEAM_ID:}
+      key-id: ${OAUTH_APPLE_KEY_ID:}
+      private-key: ${OAUTH_APPLE_PRIVATE_KEY:}
+      private-key-path: ${OAUTH_APPLE_PRIVATE_KEY_PATH:}
+      redirect-uri: ${OAUTH_APPLE_REDIRECT:http://127.0.0.1:8080/api/auth/oauth/apple/callback}
 
 # 日志配置
 logging:
   level:
     com.s2admin: debug
-    org.springframework.security: debug
+    org.springframework.security: warn
+    org.hibernate.SQL: warn

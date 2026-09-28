@@ -4,61 +4,258 @@
 		Field,
 		FieldLabel,
 		FieldDescription,
-		FieldSeparator,
-	} from "$lib/components/ui/field/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import { cn, type WithElementRef } from "$lib/utils.js";
-	import type { HTMLFormAttributes } from "svelte/elements";
+		FieldSeparator
+	} from '$lib/components/ui/field/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { authStore } from '$lib/stores/auth.svelte';
+	import { getCaptcha, forgotPassword, resetPassword, oauthProviders } from '$lib/api/auth';
+	import { localeStore } from '$lib/i18n/locale.svelte';
+	import LocaleSwitch from '$lib/components/locale-switch.svelte';
+	import { env } from '$env/dynamic/public';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+	import { isStrongPassword, PASSWORD_HINT } from '$lib/utils/password';
+	import GalleryVerticalEndIcon from '@lucide/svelte/icons/gallery-vertical-end';
+	import { APP_NAME } from '$lib/config';
+	import type { CaptchaResult } from '$lib/types/auth';
 
-	let {
-		ref = $bindable(null),
-		class: className,
-		...restProps
-	}: WithElementRef<HTMLFormAttributes> = $props();
+	let username = $state('admin');
+	let password = $state('admin123');
+	let captcha = $state('');
+	let captchaInfo = $state<CaptchaResult | null>(null);
+	let rememberMe = $state(false);
+	let error = $state<string | null>(null);
+	let mode = $state<'login' | 'forgot'>('login');
+	let resetAccount = $state('');
+	let resetCode = $state('');
+	let resetPwd = $state('');
+	let mockHint = $state('');
+	let providers = $state<{ id: string; name: string }[]>([]);
+	const apiBase = env.PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
-	const id = $props.id();
+	async function loadCaptcha() {
+		try {
+			captchaInfo = await getCaptcha();
+			captcha = '';
+		} catch {
+			captchaInfo = { enabled: false };
+		}
+	}
+
+	onMount(async () => {
+		const params = new URLSearchParams(window.location.search);
+		const oauthToken = params.get('oauthToken');
+		const oauthRefresh = params.get('oauthRefresh');
+		const oauthError = params.get('oauthError');
+		if (oauthToken || oauthRefresh || oauthError) {
+			history.replaceState({}, '', window.location.pathname);
+		}
+		if (oauthError) error = oauthError;
+		if (oauthToken && oauthRefresh) {
+			try {
+				await authStore.acceptTokens(oauthToken, oauthRefresh);
+				await goto(authStore.currentUser?.mustChangePassword ? '/profile' : '/dashboard');
+				return;
+			} catch (err) {
+				error = err instanceof Error ? err.message : localeStore.t('login.failed');
+			}
+		}
+		await loadCaptcha();
+		providers = await oauthProviders().catch(() => []);
+	});
+
+	async function handleSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		error = null;
+		try {
+			await authStore.login(username, password, captcha || undefined, captchaInfo?.captchaKey, rememberMe);
+			await goto(authStore.currentUser?.mustChangePassword ? '/profile' : '/dashboard');
+		} catch (err) {
+			error = err instanceof Error ? err.message : localeStore.t('login.failed');
+			await loadCaptcha();
+		}
+	}
+
+	async function sendCode() {
+		error = null;
+		mockHint = '';
+		try {
+			const r = await forgotPassword(
+				resetAccount || username,
+				captcha || undefined,
+				captchaInfo?.captchaKey
+			);
+			mockHint = r.mockCode ? `开发环境验证码: ${r.mockCode}` : r.message;
+		} catch (err) {
+			error = err instanceof Error ? err.message : localeStore.t('login.sendFailed');
+		} finally {
+			await loadCaptcha();
+		}
+	}
+
+	async function doReset() {
+		error = null;
+		if (!isStrongPassword(resetPwd)) {
+			error = PASSWORD_HINT;
+			return;
+		}
+		try {
+			await resetPassword(resetAccount || username, resetCode, resetPwd);
+			mode = 'login';
+			password = '';
+			error = null;
+			mockHint = '密码已重置,请登录';
+		} catch (err) {
+			error = err instanceof Error ? err.message : localeStore.t('login.resetFailed');
+		}
+	}
 </script>
 
-<form class={cn("flex flex-col gap-6", className)} bind:this={ref} {...restProps}>
-	<FieldGroup>
-		<div class="flex flex-col items-center gap-1 text-center">
-			<h1 class="text-2xl font-bold">Login to your account</h1>
-			<p class="text-muted-foreground text-sm text-balance">
-				Enter your email below to login to your account
-			</p>
-		</div>
-		<Field>
-			<FieldLabel for="email-{id}">Email</FieldLabel>
-			<Input id="email-{id}" type="email" placeholder="m@example.com" required />
-		</Field>
-		<Field>
-			<div class="flex items-center">
-				<FieldLabel for="password-{id}">Password</FieldLabel>
-				<a href="##" class="ms-auto text-sm underline-offset-4 hover:underline">
-					Forgot your password?
-				</a>
+<div class="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+	<div class="flex w-full max-w-sm flex-col gap-6">
+		<div class="flex items-center justify-between">
+			<a href="/login" class="flex items-center gap-2 font-medium">
+			<div class="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
+				<GalleryVerticalEndIcon class="size-4" />
 			</div>
-			<Input id="password-{id}" type="password" required />
-		</Field>
-		<Field>
-			<Button type="submit">Login</Button>
-		</Field>
-		<FieldSeparator>Or continue with</FieldSeparator>
-		<Field>
-			<Button variant="outline" type="button">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-					<path
-						d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-						fill="currentColor"
+			{APP_NAME}
+			</a>
+			<LocaleSwitch />
+		</div>
+		{#if mode === 'login'}
+		<form class="bg-card flex flex-col gap-6 rounded-xl border p-6 shadow-sm" onsubmit={handleSubmit}>
+			<FieldGroup>
+				<div class="flex flex-col items-center gap-1 text-center">
+					<h1 class="text-2xl font-bold">{localeStore.t('login.title')} {APP_NAME}</h1>
+					<p class="text-muted-foreground text-sm text-balance">{localeStore.t('login.subtitle')}</p>
+				</div>
+
+				{#if error}
+					<div class="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm">
+						{error}
+					</div>
+				{/if}
+
+				<Field>
+					<FieldLabel for="username">{localeStore.t('login.account')}</FieldLabel>
+					<Input
+						id="username"
+						type="text"
+						placeholder={localeStore.t('login.accountPh')}
+						required
+						autocomplete="username"
+						bind:value={username}
 					/>
-				</svg>
-				Login with GitHub
-			</Button>
-			<FieldDescription class="text-center">
-				Don't have an account?
-				<a href="##" class="underline underline-offset-4">Sign up</a>
-			</FieldDescription>
-		</Field>
-	</FieldGroup>
-</form>
+				</Field>
+				<Field>
+					<FieldLabel for="password">{localeStore.t('login.password')}</FieldLabel>
+					<Input
+						id="password"
+						type="password"
+						required
+						autocomplete="current-password"
+						bind:value={password}
+					/>
+				</Field>
+				<label class="flex items-center gap-2 text-sm">
+					<Checkbox bind:checked={rememberMe} />
+					<span>{localeStore.t('login.remember')}</span>
+				</label>
+				{#if captchaInfo?.enabled}
+					<Field>
+						<FieldLabel for="captcha">{localeStore.t('login.captcha')}</FieldLabel>
+						<div class="flex items-center gap-2">
+							<Input
+								id="captcha"
+								bind:value={captcha}
+								required
+								autocomplete="off"
+								placeholder={localeStore.t('login.captchaPh')}
+								class="flex-1"
+							/>
+							<button
+								type="button"
+								class="border-input h-9 w-[120px] shrink-0 overflow-hidden rounded-md border"
+								onclick={loadCaptcha}
+								title="点击刷新验证码"
+							>
+								{#if captchaInfo.image}
+									<img src={captchaInfo.image} alt="验证码" class="h-full w-full object-cover" />
+								{/if}
+							</button>
+						</div>
+					</Field>
+				{/if}
+				<Field>
+					<Button type="submit" disabled={authStore.loading}>
+						{authStore.loading ? localeStore.t('login.submitting') : localeStore.t('login.submit')}
+					</Button>
+				</Field>
+				<button type="button" class="text-muted-foreground text-sm underline" onclick={() => (mode = 'forgot')}>
+					{localeStore.t('login.forgot')}
+				</button>
+				{#if providers.length}
+					<FieldSeparator>{localeStore.t('login.oauth')}</FieldSeparator>
+					<div class="grid grid-cols-2 gap-2">
+						{#each providers as provider (provider.id)}
+							<Button
+								type="button"
+								variant="outline"
+								href={`${apiBase}/api/auth/oauth/${provider.id}/authorize`}
+							>
+								{localeStore.t('oauth.' + provider.id)}
+							</Button>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-muted-foreground text-center text-xs">{localeStore.t('login.oauthEmpty')}</p>
+				{/if}
+				<FieldSeparator>{localeStore.t('login.hint')}</FieldSeparator>
+				<FieldDescription class="text-center">
+					默认账号 <code class="bg-muted rounded px-1 py-0.5">admin</code>
+					/ 密码 <code class="bg-muted rounded px-1 py-0.5">admin123</code>
+				</FieldDescription>
+			</FieldGroup>
+		</form>
+		{:else}
+		<div class="bg-card flex flex-col gap-4 rounded-xl border p-6 shadow-sm">
+			<h1 class="text-center text-2xl font-bold">{localeStore.t('login.reset')}</h1>
+			{#if error}
+				<div class="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm">{error}</div>
+			{/if}
+			{#if mockHint}
+				<div class="bg-muted rounded-md px-3 py-2 text-sm">{mockHint}</div>
+			{/if}
+			<Field>
+				<FieldLabel>{localeStore.t('login.resetAccount')}</FieldLabel>
+				<Input bind:value={resetAccount} placeholder={username} />
+			</Field>
+			{#if captchaInfo?.enabled}
+				<div class="flex items-center gap-2">
+					<Input bind:value={captcha} placeholder={localeStore.t('login.imageCaptcha')} class="flex-1" />
+					<button type="button" class="border-input h-9 w-[120px] shrink-0 overflow-hidden rounded-md border" onclick={loadCaptcha}>
+						{#if captchaInfo.image}
+							<img src={captchaInfo.image} alt="验证码" class="h-full w-full object-cover" />
+						{/if}
+					</button>
+				</div>
+			{/if}
+			<div class="flex gap-2">
+				<Input class="flex-1" bind:value={resetCode} placeholder={localeStore.t('login.mailCode')} />
+				<Button type="button" variant="outline" onclick={sendCode}>{localeStore.t('login.sendCode')}</Button>
+			</div>
+			<Field>
+				<FieldLabel>{localeStore.t('login.newPassword')}</FieldLabel>
+				<Input type="password" bind:value={resetPwd} />
+				<p class="text-muted-foreground text-xs">{PASSWORD_HINT}</p>
+			</Field>
+			<Button onclick={doReset}>{localeStore.t('login.confirmReset')}</Button>
+			<button type="button" class="text-muted-foreground text-sm underline" onclick={() => (mode = 'login')}>
+				{localeStore.t('login.back')}
+			</button>
+		</div>
+		{/if}
+	</div>
+</div>

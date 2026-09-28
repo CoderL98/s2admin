@@ -1,0 +1,32 @@
+# 可选外部依赖。默认 SQLite + 内存缓存无需本文件。
+# 使用: docker compose up -d
+# 后端: mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.arguments=--spring.profiles.active=mysql --s2admin.cache.type=redis
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: s2admin
+    ports:
+      - "3306:3306"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - s2admin-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  s2admin-mysql:
